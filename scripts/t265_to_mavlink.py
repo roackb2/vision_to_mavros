@@ -4,7 +4,7 @@
 ##          librealsense T265 to MAVLink           ##
 #####################################################
 # This script assumes pyrealsense2.[].so file is found under the same directory as this script
-# Install required packages: 
+# Install required packages:
 #   pip3 install pyrealsense2
 #   pip3 install transformations
 #   pip3 install pymavlink
@@ -28,6 +28,7 @@ import time
 import argparse
 import threading
 import signal
+import paho.mqtt.client as mqtt
 
 from time import sleep
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -52,7 +53,7 @@ connection_timeout_sec_default = 5
 
 # Transformation to convert different camera orientations to NED convention. Replace camera_orientation_default for your configuration.
 #   0: Forward, USB port to the right
-#   1: Downfacing, USB port to the right 
+#   1: Downfacing, USB port to the right
 #   2: Forward, 45 degree tilted down
 # Important note for downfacing camera: you need to tilt the vehicle's nose up a little - not flat - before you run the script, otherwise the initial yaw will be randomized, read here for more details: https://github.com/IntelRealSense/librealsense/issues/4080. Tilt the vehicle to any other sides and the yaw might not be as stable.
 camera_orientation_default = 0
@@ -95,7 +96,7 @@ scale_factor = 1.0
 # Enable using yaw from compass to align north (zero degree is facing north)
 compass_enabled = 0
 
-# pose data confidence: 0x0 - Failed / 0x1 - Low / 0x2 - Medium / 0x3 - High 
+# pose data confidence: 0x0 - Failed / 0x1 - Low / 0x2 - Medium / 0x3 - High
 pose_data_confidence_level = ('FAILED', 'Low', 'Medium', 'High')
 
 # lock for thread synchronization
@@ -184,7 +185,7 @@ if not vision_position_estimate_msg_hz:
     progress("INFO: Using default vision_position_estimate_msg_hz %s" % vision_position_estimate_msg_hz)
 else:
     progress("INFO: Using vision_position_estimate_msg_hz %s" % vision_position_estimate_msg_hz)
-    
+
 if not vision_position_delta_msg_hz:
     vision_position_delta_msg_hz = vision_position_delta_msg_hz_default
     progress("INFO: Using default vision_position_delta_msg_hz %s" % vision_position_delta_msg_hz)
@@ -238,7 +239,7 @@ if not debug_enable:
     debug_enable = 0
 else:
     debug_enable = 1
-    np.set_printoptions(precision=4, suppress=True) # Format output on terminal 
+    np.set_printoptions(precision=4, suppress=True) # Format output on terminal
     progress("INFO: Debug messages enabled.")
 
 
@@ -314,7 +315,7 @@ def send_vision_position_delta_message():
                 delta_time_us,	    # us: Time since last reported camera frame
                 delta_angle_rad,    # float[3] in radian: Defines a rotation vector in body frame that rotates the vehicle from the previous to the current orientation
                 delta_position_m,   # float[3] in m: Change in position from previous to current frame rotated into body frame (0=forward, 1=right, 2=down)
-                current_confidence_level # Normalized confidence value from 0 to 100. 
+                current_confidence_level # Normalized confidence value from 0 to 100.
             )
 
             # Save static variables
@@ -332,7 +333,7 @@ def send_vision_speed_estimate_message():
             covariance  = np.array([cov_pose,   0,          0,
                                     0,          cov_pose,   0,
                                     0,          0,          cov_pose])
-            
+
             # Send the message
             conn.mav.vision_speed_estimate_send(
                 current_time_us,            # us Timestamp (UNIX time or time since system boot)
@@ -362,7 +363,7 @@ def send_msg_to_gcs(text_to_be_sent):
 def set_default_global_origin():
     conn.mav.set_gps_global_origin_send(
         1,
-        home_lat, 
+        home_lat,
         home_lon,
         home_alt
     )
@@ -380,7 +381,7 @@ def set_default_home_position():
 
     conn.mav.set_home_position_send(
         1,
-        home_lat, 
+        home_lat,
         home_lon,
         home_alt,
         x,
@@ -394,7 +395,7 @@ def set_default_home_position():
 
 
 # Request a timesync update from the flight controller, for future work.
-# TODO: Inspect the usage of timesync_update 
+# TODO: Inspect the usage of timesync_update
 def update_timesync(ts=0, tc=0):
     if ts == 0:
         ts = int(round(time.time() * 1000))
@@ -430,7 +431,7 @@ def realsense_notification_callback(notif):
 
 def realsense_connect():
     global pipe, pose_sensor
-    
+
     # Declare RealSense pipeline, encapsulating the actual device and sensors
     pipe = rs.pipeline()
 
@@ -529,7 +530,7 @@ if enable_msg_vision_position_estimate:
 
 if enable_msg_vision_position_delta:
     sched.add_job(send_vision_position_delta_message, 'interval', seconds = 1/vision_position_delta_msg_hz)
-    send_vision_position_delta_message.H_aeroRef_PrevAeroBody = tf.quaternion_matrix([1,0,0,0]) 
+    send_vision_position_delta_message.H_aeroRef_PrevAeroBody = tf.quaternion_matrix([1,0,0,0])
     send_vision_position_delta_message.prev_time_us = int(round(time.time() * 1000000))
 
 if enable_msg_vision_speed_estimate:
@@ -557,12 +558,31 @@ def sigint_handler(sig, frame):
 signal.signal(signal.SIGINT, sigint_handler)
 
 # gracefully terminate the script if a terminate signal is received
-# (e.g. kill -TERM).  
+# (e.g. kill -TERM).
 def sigterm_handler(sig, frame):
     global main_loop_should_quit
     main_loop_should_quit = True
     global exit_code
     exit_code = 0
+
+# The callback for when the client receives a CONNACK response from the server.
+def on_connect(client, userdata, flags, rc):
+    print("Connected with result code "+str(rc))
+
+    # Subscribing in on_connect() means that if we lose the connection and
+    # reconnect then subscriptions will be renewed.
+    client.subscribe("$SYS/#")
+
+# The callback for when a PUBLISH message is received from the server.
+def on_message(client, userdata, msg):
+    print(msg.topic+" "+str(msg.payload))
+
+client = mqtt.Client()
+client.on_connect = on_connect
+client.on_message = on_message
+
+client.connect("mqtt.eclipse.org", 1883, 60)
+
 
 signal.signal(signal.SIGTERM, sigterm_handler)
 
@@ -587,12 +607,12 @@ try:
 
                 # Pose data consists of translation and rotation
                 data = pose.get_pose_data()
-                
-                # Confidence level value from T265: 0-3, remapped to 0 - 100: 0% - Failed / 33.3% - Low / 66.6% - Medium / 100% - High  
-                current_confidence_level = float(data.tracker_confidence * 100 / 3)  
+
+                # Confidence level value from T265: 0-3, remapped to 0 - 100: 0% - Failed / 33.3% - Low / 66.6% - Medium / 100% - High
+                current_confidence_level = float(data.tracker_confidence * 100 / 3)
 
                 # In transformations, Quaternions w+ix+jy+kz are represented as [w, x, y, z]!
-                H_T265Ref_T265body = tf.quaternion_matrix([data.rotation.w, data.rotation.x, data.rotation.y, data.rotation.z]) 
+                H_T265Ref_T265body = tf.quaternion_matrix([data.rotation.w, data.rotation.x, data.rotation.y, data.rotation.z])
                 H_T265Ref_T265body[0][3] = data.translation.x * scale_factor
                 H_T265Ref_T265body[1][3] = data.translation.y * scale_factor
                 H_T265Ref_T265body[2][3] = data.translation.z * scale_factor
@@ -624,7 +644,7 @@ try:
                         elif speed_delta > jump_speed_threshold:
                             progress("Speed jumped by: %s" % speed_delta)
                         increment_reset_counter()
-                    
+
                 prev_data = data
 
                 # Take offsets from body's center of gravity (or IMU) to camera's origin into account
@@ -647,12 +667,17 @@ try:
                     progress("DEBUG: NED RPY[deg]: {}".format( np.array( tf.euler_from_matrix( H_aeroRef_aeroBody, 'sxyz')) * 180 / m.pi))
                     progress("DEBUG: Raw pos xyz : {}".format( np.array( [data.translation.x, data.translation.y, data.translation.z])))
                     progress("DEBUG: NED pos xyz : {}".format( np.array( tf.translation_from_matrix( H_aeroRef_aeroBody))))
-
+        # Blocking call that processes network traffic, dispatches callbacks and
+        # handles reconnecting.
+        # Other loop*() functions are available that give a threaded interface and a
+        # manual interface.
+        client.loop_forever()
+        
 except Exception as e:
     progress(e)
 
 except:
-    send_msg_to_gcs('ERROR IN SCRIPT')  
+    send_msg_to_gcs('ERROR IN SCRIPT')
     progress("Unexpected error: %s" % sys.exc_info()[0])
 
 finally:
