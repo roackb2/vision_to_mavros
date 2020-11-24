@@ -6,13 +6,14 @@
 # This script assumes pyrealsense2.[].so file is found under the same directory as this script
 # Install required packages: 
 #   pip install pyrealsense2
-#   pip install transformations
+#   pip3 install transformations
 #   pip3 install dronekit
 #   pip3 install apscheduler
 
  # Set the path for IDLE
 import sys
 sys.path.append("/usr/local/lib/")
+sys.path.append("/usr/local/lib/python3.5/dist-packages")
 
 # Set MAVLink protocol to 2.
 import os
@@ -37,7 +38,7 @@ from pymavlink import mavutil
 #######################################
 
 # Default configurations for connection to the FCU
-connection_string_default = '/dev/ttyUSB0'
+connection_string_default = '/dev/ttyUSB1'
 connection_baudrate_default = 921600
 connection_timeout_sec_default = 5
 vision_msg_hz_default = 30
