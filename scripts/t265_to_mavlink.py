@@ -20,6 +20,8 @@ import os
 os.environ["MAVLINK20"] = "1"
 
 # Import the libraries
+import io
+# import cv2
 import pyrealsense2 as rs
 import numpy as np
 import transformations as tf
@@ -28,12 +30,14 @@ import time
 import argparse
 import threading
 import signal
+import base64
 import paho.mqtt.client as mqtt
 
 from time import sleep
 from apscheduler.schedulers.background import BackgroundScheduler
 from dronekit import connect, VehicleMode
 from pymavlink import mavutil
+from PIL import Image
 
 
 # Replacement of the standard print() function to flush the output
@@ -441,6 +445,8 @@ def realsense_connect():
 
     # Enable the stream we are interested in
     cfg.enable_stream(rs.stream.pose) # Positional data
+    # cfg.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30) # Image
+    # cfg.enable_all_streams()
 
     # Configure callback for relocalization event
     device = cfg.resolve(pipe).get_device()
@@ -633,10 +639,29 @@ if compass_enabled == 1:
 
 send_msg_to_gcs('Sending vision messages to FCU')
 
+# def send_img(frame, topic):
+#     data = frame.get_data()
+#     arr = np.asanyarray(data)
+#     success, encoded_image = cv2.imencode('.png', image)
+#     bytes = encoded_image.tobytes()
+#     str = base64.b64encode(bytes)
+#     client.publish(topic, str)
+
+    # img = Image.fromarray(arr)
+    # img_byte_arr = io.BytesIO()
+    # img.save(img_byte_arr, format='PNG')
+    # bytes = img_byte_arr.getvalue()
+
 try:
     while not main_loop_should_quit:
         # Wait for the next set of frames from the camera
         frames = pipe.wait_for_frames()
+
+        # Fetch image
+        # f1 = frames.get_fisheye_frame(1).as_video_frame()
+        # f2 = frames.get_fisheye_frame(2).as_video_frame()
+        # send_img(f1, 'image/1')
+        # send_img(f2, 'image/2')
 
         # Fetch pose frame
         pose = frames.get_pose_frame()
