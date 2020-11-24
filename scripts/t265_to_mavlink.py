@@ -264,6 +264,7 @@ def mavlink_loop(conn, callbacks):
             continue
         callbacks[m.get_type()](m)
 
+
 # https://mavlink.io/en/messages/common.html#VISION_POSITION_ESTIMATE
 def send_vision_position_estimate_message():
     global current_time_us, H_aeroRef_aeroBody, reset_counter
@@ -567,21 +568,62 @@ def sigterm_handler(sig, frame):
 
 # The callback for when the client receives a CONNACK response from the server.
 def on_connect(client, userdata, flags, rc):
-    print("Connected with result code "+str(rc))
-
+    send_msg_to_gcs("Connected to MQTT server with result code "+str(rc))
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
-    client.subscribe("$SYS/#")
+    # client.subscribe("$SYS/#")
+    client.subscribe("command")
+    client.publish("presence", "drone")
 
 # The callback for when a PUBLISH message is received from the server.
 def on_message(client, userdata, msg):
-    print(msg.topic+" "+str(msg.payload))
+    send_msg_to_gcs("message received, topic: " + msg.topic + ",payload: " + msg.payload.decode())
+    if msg.topic == "command":
+        cmd = msg.payload.decode("utf-8")
+        send_msg_to_gcs("command received: " + cmd)
+        handle_cmd(cmd)
+
+
+def handle_cmd(cmd):
+    if cmd == "arm":
+        send_msg_to_gcs("arming...")
+        conn.mav.command_long_send(
+            1,
+            1,
+            mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
+            0,
+            1, 0, 0, 0, 0, 0, 0)
+    elif cmd == "disarm":
+        send_msg_to_gcs("disarming...")
+        conn.mav.command_long_send(
+            1,
+            1,
+            mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
+            1,
+            1, 0, 0, 0, 0, 0, 0)
+    elif cmd == "takeoff":
+        send_msg_to_gcs("takeoff!")
+        conn.mav.command_long_send(
+            1,
+            1,
+            mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
+            1,
+            0, 0, 0, 0, 0, 0, 0)
+    elif cmd == "mission_start":
+        send_msg_to_gcs("mission_start!")
+        conn.mav.command_long_send(
+            1,
+            1,
+            mavutil.mavlink.MAV_CMD_MISSION_START,
+            1,
+            0, 4, 0, 0, 0, 0, 0)
+
 
 client = mqtt.Client()
 client.on_connect = on_connect
 client.on_message = on_message
 
-client.connect("mqtt.eclipse.org", 1883, 60)
+client.connect("192.168.2.64", 1883, 10)
 
 
 signal.signal(signal.SIGTERM, sigterm_handler)
@@ -671,8 +713,8 @@ try:
         # handles reconnecting.
         # Other loop*() functions are available that give a threaded interface and a
         # manual interface.
-        client.loop_forever()
-        
+        client.loop()
+
 except Exception as e:
     progress(e)
 
