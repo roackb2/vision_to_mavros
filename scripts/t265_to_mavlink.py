@@ -4,7 +4,7 @@
 ##          librealsense T265 to MAVLink           ##
 #####################################################
 # This script assumes pyrealsense2.[].so file is found under the same directory as this script
-# Install required packages: 
+# Install required packages:
 #   pip install pyrealsense2
 #   pip3 install transformations
 #   pip3 install dronekit
@@ -27,6 +27,8 @@ import math as m
 import time
 import argparse
 import threading
+import paho.mqtt.client as mqtt
+
 from time import sleep
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -60,13 +62,13 @@ compass_enabled = 0
 # Default global position of home/ origin
 home_lat = 151269321       # Somewhere in Africa
 home_lon = 16624301        # Somewhere in Africa
-home_alt = 163000 
+home_alt = 163000
 
 vehicle = None
 is_vehicle_connected = False
 pipe = None
 
-# pose data confidence: 0x0 - Failed / 0x1 - Low / 0x2 - Medium / 0x3 - High 
+# pose data confidence: 0x0 - Failed / 0x1 - Low / 0x2 - Medium / 0x3 - High
 pose_data_confidence_level = ('Failed', 'Low', 'Medium', 'High')
 
 #######################################
@@ -121,7 +123,7 @@ if not vision_msg_hz:
     print("INFO: Using default vision_msg_hz", vision_msg_hz)
 else:
     print("INFO: Using vision_msg_hz", vision_msg_hz)
-    
+
 if not confidence_msg_hz:
     confidence_msg_hz = confidence_msg_hz_default
     print("INFO: Using default confidence_msg_hz", confidence_msg_hz)
@@ -154,11 +156,11 @@ else:
 
 # Transformation to convert different camera orientations to NED convention. Replace camera_orientation_default for your configuration.
 #   0: Forward, USB port to the right
-#   1: Downfacing, USB port to the right 
+#   1: Downfacing, USB port to the right
 #   2: Forward, 45 degree tilted down
 # Important note for downfacing camera: you need to tilt the vehicle's nose up a little - not flat - before you run the script, otherwise the initial yaw will be randomized, read here for more details: https://github.com/IntelRealSense/librealsense/issues/4080. Tilt the vehicle to any other sides and the yaw might not be as stable.
 
-if camera_orientation == 0: 
+if camera_orientation == 0:
     # Forward, USB port to the right
     H_aeroRef_T265Ref = np.array([[0,0,-1,0],[1,0,0,0],[0,-1,0,0],[0,0,0,1]])
     H_T265body_aeroBody = np.linalg.inv(H_aeroRef_T265Ref)
@@ -174,7 +176,7 @@ elif camera_orientation == 2:
         [-0.70710676, -0.        , -0.70710676, -0.        ],
         [-0.70710676,  0.        ,  0.70710676,  0.        ],
         [ 0.        ,  0.        ,  0.        ,  1.        ]])
-else: 
+else:
     # Default is facing forward, USB port to the right
     H_aeroRef_T265Ref = np.array([[0,0,-1,0],[1,0,0,0],[0,-1,0,0],[0,0,0,1]])
     H_T265body_aeroBody = np.linalg.inv(H_aeroRef_T265Ref)
@@ -188,7 +190,7 @@ if not debug_enable:
     debug_enable = 0
 else:
     debug_enable = 1
-    np.set_printoptions(precision=4, suppress=True) # Format output on terminal 
+    np.set_printoptions(precision=4, suppress=True) # Format output on terminal
     print("INFO: Debug messages enabled.")
 
 #######################################
@@ -216,7 +218,7 @@ def send_vision_position_message():
         vehicle.flush()
 
 # For a lack of a dedicated message, we pack the confidence level into a message that will not be used, so we can view it on GCS
-# Confidence level value: 0 - 3, remapped to 0 - 100: 0% - Failed / 33.3% - Low / 66.6% - Medium / 100% - High 
+# Confidence level value: 0 - 3, remapped to 0 - 100: 0% - Failed / 33.3% - Low / 66.6% - Medium / 100% - High
 def send_confidence_level_dummy_message():
     global is_vehicle_connected, data, current_confidence
     if is_vehicle_connected == True and data is not None:
@@ -229,7 +231,7 @@ def send_confidence_level_dummy_message():
             0,	            #Time since last reported camera frame
             [0, 0, 0],      #angle_delta
             [0, 0, 0],      #position_delta
-            float(data.tracker_confidence * 100 / 3)          
+            float(data.tracker_confidence * 100 / 3)
         )
         vehicle.send_mavlink(msg)
         vehicle.flush()
@@ -240,7 +242,7 @@ def send_confidence_level_dummy_message():
             confidence_status_string = 'Tracking confidence: ' + pose_data_confidence_level[data.tracker_confidence]
             status_msg = vehicle.message_factory.statustext_encode(
                 3,	            #severity, defined here: https://mavlink.io/en/messages/common.html#MAV_SEVERITY, 3 will let the message be displayed on Mission Planner HUD
-                confidence_status_string.encode()	  #text	char[50]       
+                confidence_status_string.encode()	  #text	char[50]
             )
             vehicle.send_mavlink(status_msg)
             vehicle.flush()
@@ -251,7 +253,7 @@ def set_default_global_origin():
     if  is_vehicle_connected == True:
         msg = vehicle.message_factory.set_gps_global_origin_encode(
             int(vehicle._master.source_system),
-            home_lat, 
+            home_lat,
             home_lon,
             home_alt
         )
@@ -273,7 +275,7 @@ def set_default_home_position():
 
         msg = vehicle.message_factory.set_home_position_encode(
             int(vehicle._master.source_system),
-            home_lat, 
+            home_lat,
             home_lon,
             home_alt,
             x,
@@ -289,7 +291,7 @@ def set_default_home_position():
         vehicle.flush()
 
 # Request a timesync update from the flight controller, for future work.
-# TODO: Inspect the usage of timesync_update 
+# TODO: Inspect the usage of timesync_update
 def update_timesync(ts=0, tc=0):
     if ts == 0:
         ts = int(round(time.time() * 1000))
@@ -321,7 +323,7 @@ def att_msg_callback(self, attr_name, value):
 
 def vehicle_connect():
     global vehicle, is_vehicle_connected
-    
+
     try:
         vehicle = connect(connection_string, wait_ready = True, baud = connection_baudrate, source_system = 1)
     except:
@@ -344,7 +346,7 @@ def realsense_connect():
     cfg = rs.config()
 
     # Enable the stream we are interested in
-    cfg.enable_stream(rs.stream.pose) # Positional data 
+    cfg.enable_stream(rs.stream.pose) # Positional data
 
     # Start streaming with requested config
     pipe.start(cfg)
@@ -354,7 +356,7 @@ def scale_update():
     global scale_factor
     while True:
         scale_factor = float(input("INFO: Type in new scale as float number\n"))
-        print("INFO: New scale is ", scale_factor)  
+        print("INFO: New scale is ", scale_factor)
 
 #######################################
 # Main code starts here
@@ -400,6 +402,65 @@ if compass_enabled == 1:
     # Wait a short while for yaw to be correctly initiated
     time.sleep(1)
 
+# The callback for when the client receives a CONNACK response from the server.
+def on_connect(client, userdata, flags, rc):
+    send_msg_to_gcs("Connected to MQTT server with result code "+str(rc))
+    # Subscribing in on_connect() means that if we lose the connection and
+    # reconnect then subscriptions will be renewed.
+    # client.subscribe("$SYS/#")
+    client.subscribe("command")
+    client.publish("presence", "drone")
+
+# The callback for when a PUBLISH message is received from the server.
+def on_message(client, userdata, msg):
+    send_msg_to_gcs("message received, topic: " + msg.topic + ",payload: " + msg.payload.decode())
+    if msg.topic == "command":
+        cmd = msg.payload.decode("utf-8")
+        send_msg_to_gcs("command received: " + cmd)
+        handle_cmd(cmd)
+
+
+def handle_cmd(cmd):
+    if cmd == "arm":
+        send_msg_to_gcs("arming...")
+        conn.mav.command_long_send(
+            1,
+            1,
+            mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
+            0,
+            1, 0, 0, 0, 0, 0, 0)
+    elif cmd == "disarm":
+        send_msg_to_gcs("disarming...")
+        conn.mav.command_long_send(
+            1,
+            1,
+            mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
+            0,
+            0, 0, 0, 0, 0, 0, 0)
+    elif cmd == "takeoff":
+        send_msg_to_gcs("takeoff!")
+        conn.mav.command_long_send(
+            1,
+            1,
+            mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
+            1,
+            0, 0, 0, 0, 0, 0, 0)
+    elif cmd == "mission_start":
+        send_msg_to_gcs("mission_start!")
+        conn.mav.command_long_send(
+            1,
+            1,
+            mavutil.mavlink.MAV_CMD_MISSION_START,
+            1,
+            0, 4, 0, 0, 0, 0, 0)
+
+
+client = mqtt.Client()
+client.on_connect = on_connect
+client.on_message = on_message
+
+client.connect("192.168.2.64", 1883, 10)
+
 print("INFO: Sending VISION_POSITION_ESTIMATE messages to FCU.")
 
 try:
@@ -412,7 +473,7 @@ try:
             print("WARNING: Attempting to reconnect ...")
             vehicle_connect()
             continue
-        
+
         # Wait for the next set of frames from the camera
         frames = pipe.wait_for_frames()
 
@@ -427,7 +488,7 @@ try:
             data = pose.get_pose_data()
 
             # In transformations, Quaternions w+ix+jy+kz are represented as [w, x, y, z]!
-            H_T265Ref_T265body = tf.quaternion_matrix([data.rotation.w, data.rotation.x, data.rotation.y, data.rotation.z]) 
+            H_T265Ref_T265body = tf.quaternion_matrix([data.rotation.w, data.rotation.x, data.rotation.y, data.rotation.z])
             H_T265Ref_T265body[0][3] = data.translation.x * scale_factor
             H_T265Ref_T265body[1][3] = data.translation.y * scale_factor
             H_T265Ref_T265body[2][3] = data.translation.z * scale_factor
@@ -455,9 +516,11 @@ try:
                 print("DEBUG: NED RPY[deg]: {}".format( np.array( tf.euler_from_matrix( H_aeroRef_aeroBody, 'sxyz')) * 180 / m.pi))
                 print("DEBUG: Raw pos xyz : {}".format( np.array( [data.translation.x, data.translation.y, data.translation.z])))
                 print("DEBUG: NED pos xyz : {}".format( np.array( tf.translation_from_matrix( H_aeroRef_aeroBody))))
-                
+    client.loop()
+
+
 except KeyboardInterrupt:
-    print("INFO: KeyboardInterrupt has been caught. Cleaning up...")     
+    print("INFO: KeyboardInterrupt has been caught. Cleaning up...")
 
 finally:
     pipe.stop()
