@@ -599,8 +599,8 @@ def handle_cmd(cmd):
             1,
             1,
             mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
-            1,
-            1, 0, 0, 0, 0, 0, 0)
+            0,
+            0, 0, 0, 0, 0, 0, 0)
     elif cmd == "takeoff":
         send_msg_to_gcs("takeoff!")
         conn.mav.command_long_send(
