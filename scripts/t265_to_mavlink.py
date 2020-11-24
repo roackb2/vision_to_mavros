@@ -14,6 +14,7 @@
 # Set the path for IDLE
 import sys
 sys.path.append("/usr/local/lib/")
+sys.path.append("/usr/local/lib/python3.5/dist-packages")
 
 # Set MAVLink protocol to 2.
 import os
@@ -47,7 +48,7 @@ def progress(string):
 #######################################
 
 # Default configurations for connection to the FCU
-connection_string_default = '/dev/ttyUSB0'
+connection_string_default = '/dev/ttyUSB1'
 connection_baudrate_default = 921600
 connection_timeout_sec_default = 5
 
@@ -67,7 +68,7 @@ enable_msg_vision_position_delta = False
 vision_position_delta_msg_hz_default = 30.0
 
 # https://mavlink.io/en/messages/common.html#VISION_SPEED_ESTIMATE
-enable_msg_vision_speed_estimate = True
+enable_msg_vision_speed_estimate = False
 vision_speed_estimate_msg_hz_default = 30.0
 
 # https://mavlink.io/en/messages/common.html#STATUSTEXT
@@ -75,20 +76,20 @@ enable_update_tracking_confidence_to_gcs = True
 update_tracking_confidence_to_gcs_hz_default = 1.0
 
 # Monitor user's online input via keyboard, can only be used when runs from terminal
-enable_user_keyboard_input = False
+enable_user_keyboard_input = True
 
 # Default global position for EKF home/ origin
-enable_auto_set_ekf_home = False
-home_lat = 151269321    # Somewhere random
-home_lon = 16624301     # Somewhere random
-home_alt = 163000       # Somewhere random
+enable_auto_set_ekf_home = True
+home_lat = 10       # Somewhere in Africa
+home_lon = 10        # Somewhere in Africa
+home_alt = 0
 
 # TODO: Taken care of by ArduPilot, so can be removed (once the handling on AP side is confirmed stable)
 # In NED frame, offset from the IMU or the center of gravity to the camera's origin point
 body_offset_enabled = 0
-body_offset_x = 0  # In meters (m)
-body_offset_y = 0  # In meters (m)
-body_offset_z = 0  # In meters (m)
+body_offset_x = 0.05    # In meters (m), so 0.05 = 5cm
+body_offset_y = 0       # In meters (m)
+body_offset_z = 0       # In meters (m)
 
 # Global scale factor, position x y z will be scaled up/down by this factor
 scale_factor = 1.0
