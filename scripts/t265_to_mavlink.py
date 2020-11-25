@@ -60,9 +60,9 @@ scale_factor = 1.0
 compass_enabled = 0
 
 # Default global position of home/ origin
-home_lat = 151269321       # Somewhere in Africa
-home_lon = 16624301        # Somewhere in Africa
-home_alt = 163000
+home_lat = 0       # Somewhere in Africa
+home_lon = 0        # Somewhere in Africa
+home_alt = 0
 
 vehicle = None
 is_vehicle_connected = False
@@ -305,7 +305,7 @@ def update_timesync(ts=0, tc=0):
 # Listen to messages that indicate EKF is ready to set home, then set EKF home automatically.
 def statustext_callback(self, attr_name, value):
     # These are the status texts that indicates EKF is ready to receive home position
-    if is_vehicle_connected == True and value.text == "GPS Glitch" or value.text == "GPS Glitch cleared" or value.text == "EKF2 IMU1 ext nav yaw alignment complete":
+    if is_vehicle_connected == True and value.text == "GPS Glitch" or value.text == "GPS Glitch cleared" or value.text == "EKF2 IMU0 ext nav yaw alignment complete":
         time.sleep(0.1)
         print("INFO: Set EKF home with default GPS location")
         set_default_global_origin()
