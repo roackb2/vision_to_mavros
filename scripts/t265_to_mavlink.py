@@ -358,9 +358,69 @@ def scale_update():
         scale_factor = float(input("INFO: Type in new scale as float number\n"))
         print("INFO: New scale is ", scale_factor)
 
+
+# The callback for when the client receives a CONNACK response from the server.
+def on_connect(client, userdata, flags, rc):
+    print("INFO: Connected to MQTT server with result code "+str(rc))
+    # Subscribing in on_connect() means that if we lose the connection and
+    # reconnect then subscriptions will be renewed.
+    # client.subscribe("$SYS/#")
+    client.subscribe("command")
+    client.publish("presence", "drone")
+
+# The callback for when a PUBLISH message is received from the server.
+def on_message(client, userdata, msg):
+    print("INFO: message received, topic: " + msg.topic + ",payload: " + msg.payload.decode())
+    if msg.topic == "command":
+        cmd = msg.payload.decode("utf-8")
+        print("command received: " + cmd)
+        handle_cmd(cmd)
+
+
+def handle_cmd(cmd):
+    if cmd == "arm":
+        print("INFO: arming...")
+        conn.mav.command_long_send(
+            1,
+            1,
+            mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
+            0,
+            1, 0, 0, 0, 0, 0, 0)
+    elif cmd == "disarm":
+        print("INFO: disarming...")
+        conn.mav.command_long_send(
+            1,
+            1,
+            mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
+            0,
+            0, 0, 0, 0, 0, 0, 0)
+    elif cmd == "takeoff":
+        print("INFO: takeoff!")
+        conn.mav.command_long_send(
+            1,
+            1,
+            mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
+            1,
+            0, 0, 0, 0, 0, 0, 0)
+    elif cmd == "mission_start":
+        print("INFO: mission_start!")
+        conn.mav.command_long_send(
+            1,
+            1,
+            mavutil.mavlink.MAV_CMD_MISSION_START,
+            1,
+            0, 4, 0, 0, 0, 0, 0)
+
 #######################################
 # Main code starts here
 #######################################
+
+client = mqtt.Client()
+client.on_connect = on_connect
+client.on_message = on_message
+
+print("INFO: Connecting to MQTT server.")
+client.connect("192.168.2.238", 1883, 10)
 
 print("INFO: Connecting to Realsense camera.")
 realsense_connect()
@@ -401,65 +461,6 @@ sched.start()
 if compass_enabled == 1:
     # Wait a short while for yaw to be correctly initiated
     time.sleep(1)
-
-# The callback for when the client receives a CONNACK response from the server.
-def on_connect(client, userdata, flags, rc):
-    send_msg_to_gcs("Connected to MQTT server with result code "+str(rc))
-    # Subscribing in on_connect() means that if we lose the connection and
-    # reconnect then subscriptions will be renewed.
-    # client.subscribe("$SYS/#")
-    client.subscribe("command")
-    client.publish("presence", "drone")
-
-# The callback for when a PUBLISH message is received from the server.
-def on_message(client, userdata, msg):
-    send_msg_to_gcs("message received, topic: " + msg.topic + ",payload: " + msg.payload.decode())
-    if msg.topic == "command":
-        cmd = msg.payload.decode("utf-8")
-        send_msg_to_gcs("command received: " + cmd)
-        handle_cmd(cmd)
-
-
-def handle_cmd(cmd):
-    if cmd == "arm":
-        send_msg_to_gcs("arming...")
-        conn.mav.command_long_send(
-            1,
-            1,
-            mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
-            0,
-            1, 0, 0, 0, 0, 0, 0)
-    elif cmd == "disarm":
-        send_msg_to_gcs("disarming...")
-        conn.mav.command_long_send(
-            1,
-            1,
-            mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
-            0,
-            0, 0, 0, 0, 0, 0, 0)
-    elif cmd == "takeoff":
-        send_msg_to_gcs("takeoff!")
-        conn.mav.command_long_send(
-            1,
-            1,
-            mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
-            1,
-            0, 0, 0, 0, 0, 0, 0)
-    elif cmd == "mission_start":
-        send_msg_to_gcs("mission_start!")
-        conn.mav.command_long_send(
-            1,
-            1,
-            mavutil.mavlink.MAV_CMD_MISSION_START,
-            1,
-            0, 4, 0, 0, 0, 0, 0)
-
-
-client = mqtt.Client()
-client.on_connect = on_connect
-client.on_message = on_message
-
-client.connect("192.168.2.64", 1883, 10)
 
 print("INFO: Sending VISION_POSITION_ESTIMATE messages to FCU.")
 
