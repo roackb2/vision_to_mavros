@@ -290,6 +290,30 @@ def set_default_home_position():
         vehicle.send_mavlink(msg)
         vehicle.flush()
 
+def arm():
+    vehicle.armed   = True
+
+def disarm():
+    vehicle.armed   = False
+
+def takeoff():
+    vehicle.simple_takeoff(1.2)
+
+def stabilize():
+    vehicle.mode = VehicleMode("STABILIZE")
+
+def loiter():
+    vehicle.mode = VehicleMode("LOITER")
+
+def altHold():
+    vehicle.mode = VehicleMode("ALTITUDE_HOLD")
+
+def land():
+    vehicle.mode = VehicleMode("LAND")
+
+def mission_start():
+    vehicle.mode = VehicleMode("AUTO")
+
 # Request a timesync update from the flight controller, for future work.
 # TODO: Inspect the usage of timesync_update
 def update_timesync(ts=0, tc=0):
@@ -359,68 +383,66 @@ def scale_update():
         print("INFO: New scale is ", scale_factor)
 
 
+#######################################
+# MQTT Setup
+#######################################
+
 # The callback for when the client receives a CONNACK response from the server.
 def on_connect(client, userdata, flags, rc):
     print("INFO: Connected to MQTT server with result code "+str(rc))
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
     # client.subscribe("$SYS/#")
-    client.subscribe("command")
     client.publish("presence", "drone")
+    client.subscribe("command")
 
 # The callback for when a PUBLISH message is received from the server.
 def on_message(client, userdata, msg):
-    print("INFO: message received, topic: " + msg.topic + ",payload: " + msg.payload.decode())
+    print("INFO: message received, topic: " + msg.topic + ", payload: " + msg.payload.decode())
     if msg.topic == "command":
         cmd = msg.payload.decode("utf-8")
-        print("command received: " + cmd)
+        print("INFO: command received: " + cmd)
         handle_cmd(cmd)
 
-
 def handle_cmd(cmd):
-    if cmd == "arm":
-        print("INFO: arming...")
-        conn.mav.command_long_send(
-            1,
-            1,
-            mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
-            0,
-            1, 0, 0, 0, 0, 0, 0)
-    elif cmd == "disarm":
-        print("INFO: disarming...")
-        conn.mav.command_long_send(
-            1,
-            1,
-            mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
-            0,
-            0, 0, 0, 0, 0, 0, 0)
-    elif cmd == "takeoff":
-        print("INFO: takeoff!")
-        conn.mav.command_long_send(
-            1,
-            1,
-            mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
-            1,
-            0, 0, 0, 0, 0, 0, 0)
-    elif cmd == "mission_start":
-        print("INFO: mission_start!")
-        conn.mav.command_long_send(
-            1,
-            1,
-            mavutil.mavlink.MAV_CMD_MISSION_START,
-            1,
-            0, 4, 0, 0, 0, 0, 0)
-
-#######################################
-# Main code starts here
-#######################################
+    try:
+        if cmd == "arm":
+            print("INFO: arming...")
+            arm()
+        elif cmd == "disarm":
+            print("INFO: disarming...")
+            disarm()
+        elif cmd == "takeoff":
+            print("INFO: takeoff!")
+            takeoff()
+        elif cmd == "land":
+            print("INFO: Land!")
+            land()
+        elif cmd == "stabilize":
+            print("INFO: Mode Stabilize")
+            stabilize()
+        elif cmd == "loiter":
+            print("INFO: Mode Loiter")
+            loiter()
+        elif cmd == "altHold":
+            print("INFO: Mode Altitude Hold!")
+            altHold()
+        elif cmd == "mission_start":
+            print("INFO: mission_start!")
+            mission_start()
+        else:
+            print("INFO: received unrecognized command: " + cmd)
+    except Exeption as err:
+        print("Error: " + err)
 
 client = mqtt.Client()
 client.on_connect = on_connect
 client.on_message = on_message
 
-print("INFO: Connecting to MQTT server.")
-client.connect("192.168.2.238", 1883, 10)
+#######################################
+# Main code starts here
+#######################################
+
 
 print("INFO: Connecting to Realsense camera.")
 realsense_connect()
@@ -462,11 +484,15 @@ if compass_enabled == 1:
     # Wait a short while for yaw to be correctly initiated
     time.sleep(1)
 
+print("INFO: Connecting to MQTT server.")
+# client.connect("192.168.2.238", 1883, 10)
+client.connect("192.168.2.64", 1883, 10)
+client.loop_start()
+
 print("INFO: Sending VISION_POSITION_ESTIMATE messages to FCU.")
 
 try:
     while True:
-
         # Monitor last_heartbeat to reconnect in case of lost connection
         if vehicle.last_heartbeat > connection_timeout_sec_default:
             is_vehicle_connected = False
@@ -517,14 +543,17 @@ try:
                 print("DEBUG: NED RPY[deg]: {}".format( np.array( tf.euler_from_matrix( H_aeroRef_aeroBody, 'sxyz')) * 180 / m.pi))
                 print("DEBUG: Raw pos xyz : {}".format( np.array( [data.translation.x, data.translation.y, data.translation.z])))
                 print("DEBUG: NED pos xyz : {}".format( np.array( tf.translation_from_matrix( H_aeroRef_aeroBody))))
-    client.loop()
 
 
 except KeyboardInterrupt:
     print("INFO: KeyboardInterrupt has been caught. Cleaning up...")
 
+except Exception as error:
+    print("Error: " + error)
+
 finally:
     pipe.stop()
     vehicle.close()
+    client.loop_stop(force=True)
     print("INFO: Realsense pipeline and vehicle object closed.")
     sys.exit()
