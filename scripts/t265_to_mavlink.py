@@ -20,6 +20,8 @@ import os
 os.environ["MAVLINK20"] = "1"
 
 # Import the libraries
+import io
+import base64
 import pyrealsense2 as rs
 import numpy as np
 import transformations as tf
@@ -34,6 +36,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from dronekit import connect, VehicleMode
 from pymavlink import mavutil
+from PIL import Image
 
 #######################################
 # Parameters
@@ -371,6 +374,9 @@ def realsense_connect():
 
     # Enable the stream we are interested in
     cfg.enable_stream(rs.stream.pose) # Positional data
+    cfg.enable_stream(rs.stream.fisheye, 1) # Left camera
+    cfg.enable_stream(rs.stream.fisheye, 2) # Right camera
+    # cfg.enable_all_streams()
 
     # Start streaming with requested config
     pipe.start(cfg)
@@ -382,6 +388,18 @@ def scale_update():
         scale_factor = float(input("INFO: Type in new scale as float number\n"))
         print("INFO: New scale is ", scale_factor)
 
+def send_image(frame, mqtt_client, topic):
+    try:
+        data = frame.get_data();
+        nparr = np.asanyarray(data)
+        img = Image.fromarray(nparr)
+        buf = io.BytesIO()
+        img.save(buf, format='JPEG')
+        bytes = buf.getvalue()
+        content = base64.b64encode(bytes)
+        mqtt_client.publish(topic, content)
+    except Exception as err:
+        print("Error sending image: " + str(err))
 
 #######################################
 # MQTT Setup
@@ -491,6 +509,7 @@ client.loop_start()
 
 print("INFO: Sending VISION_POSITION_ESTIMATE messages to FCU.")
 
+counter = 0
 try:
     while True:
         # Monitor last_heartbeat to reconnect in case of lost connection
@@ -503,6 +522,16 @@ try:
 
         # Wait for the next set of frames from the camera
         frames = pipe.wait_for_frames()
+
+        counter = counter + 1
+        if counter % 10 == 0:
+            print("counter: " + str(counter))
+            # fetch imagees
+            f1 = frames.get_fisheye_frame(1)
+            f2 = frames.get_fisheye_frame(2)
+            send_image(f1, client, 'relay/stream/3')
+        if counter == 10000:
+            counter = 0
 
         # Fetch pose frame
         pose = frames.get_pose_frame()
@@ -548,8 +577,8 @@ try:
 except KeyboardInterrupt:
     print("INFO: KeyboardInterrupt has been caught. Cleaning up...")
 
-except Exception as error:
-    print("Error: " + error)
+except Exception as err:
+    print("Error: " + str(err))
 
 finally:
     pipe.stop()
