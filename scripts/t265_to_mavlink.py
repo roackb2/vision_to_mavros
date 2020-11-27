@@ -585,4 +585,4 @@ finally:
     vehicle.close()
     client.loop_stop(force=True)
     print("INFO: Realsense pipeline and vehicle object closed.")
-    sys.exit()
+    sys.exit(1)
