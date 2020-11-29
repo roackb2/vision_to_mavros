@@ -504,7 +504,7 @@ if compass_enabled == 1:
 
 print("INFO: Connecting to MQTT server.")
 # client.connect("192.168.2.238", 1883, 10)
-client.connect("192.168.2.64", 1883, 10)
+client.connect("10.3.141.1", 1883, 10)
 client.loop_start()
 
 print("INFO: Sending VISION_POSITION_ESTIMATE messages to FCU.")
