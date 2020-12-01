@@ -513,13 +513,14 @@ if compass_enabled == 1:
     time.sleep(1)
 
 print("INFO: Connecting to MQTT server.")
-# client.connect("192.168.2.238", 1883, 10)
-client.connect("10.3.141.1", 1883, 10)
+client.connect("192.168.0.197", 1883, 10)
+# client.connect("10.3.141.1", 1883, 10)
 # client.connect("10.0.0.10", 1883, 10)
 client.loop_start()
 
 print("INFO: Connecting to MQTT server wit direct IP.")
-direct_client.connect("10.3.141.233", 1883, 10)
+# direct_client.connect("10.3.141.233", 1883, 10)
+direct_client.connect("192.168.0.197", 1883, 10)
 direct_client.loop_start()
 
 print("INFO: Sending VISION_POSITION_ESTIMATE messages to FCU.")
@@ -536,20 +537,14 @@ try:
             continue
 
         # Wait for the next set of frames from the camera
-        success, frames = pipe.try_wait_for_frames()
-
-        if not success:
-            print("WARNING: frames didn't arrive")
-            pipe.stop()
-            pipe.start()
-            continue
+        frames = pipe.wait_for_frames()
 
         counter = counter + 1
         if counter % 10 == 0:
             print("counter: " + str(counter))
             # fetch imagees
             f1 = frames.get_fisheye_frame(1)
-            # f2 = frames.get_fisheye_frame(2)
+            f2 = frames.get_fisheye_frame(2)
             send_image(f1, client, 'relay/stream/3')
         if counter == 10000:
             counter = 0
