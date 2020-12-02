@@ -1,6 +1,7 @@
 
 
 
+
 #!/usr/bin/env python3
 
 #####################################################
@@ -114,51 +115,51 @@ debug_enable = args.debug_enable
 # Using default values if no specified inputs
 if not connection_string:
     connection_string = connection_string_default
-    print("INFO: Using default connection_string", connection_string)
+    print("INFO: Using default connection_string", connection_string, flush=True)
 else:
-    print("INFO: Using connection_string", connection_string)
+    print("INFO: Using connection_string", connection_string, flush=True)
 
 if not connection_baudrate:
     connection_baudrate = connection_baudrate_default
-    print("INFO: Using default connection_baudrate", connection_baudrate)
+    print("INFO: Using default connection_baudrate", connection_baudrate, flush=True)
 else:
-    print("INFO: Using connection_baudrate", connection_baudrate)
+    print("INFO: Using connection_baudrate", connection_baudrate, flush=True)
 
 if not vision_msg_hz:
     vision_msg_hz = vision_msg_hz_default
-    print("INFO: Using default vision_msg_hz", vision_msg_hz)
+    print("INFO: Using default vision_msg_hz", vision_msg_hz, flush=True)
 else:
-    print("INFO: Using vision_msg_hz", vision_msg_hz)
+    print("INFO: Using vision_msg_hz", vision_msg_hz, flush=True)
 
 if not confidence_msg_hz:
     confidence_msg_hz = confidence_msg_hz_default
-    print("INFO: Using default confidence_msg_hz", confidence_msg_hz)
+    print("INFO: Using default confidence_msg_hz", confidence_msg_hz, flush=True)
 else:
-    print("INFO: Using confidence_msg_hz", confidence_msg_hz)
+    print("INFO: Using confidence_msg_hz", confidence_msg_hz, flush=True)
 
 if body_offset_enabled == 1:
-    print("INFO: Using camera position offset: Enabled, x y z is", body_offset_x, body_offset_y, body_offset_z)
+    print("INFO: Using camera position offset: Enabled, x y z is", body_offset_x, body_offset_y, body_offset_z, flush=True)
 else:
-    print("INFO: Using camera position offset: Disabled")
+    print("INFO: Using camera position offset: Disabled", flush=True)
 
 if compass_enabled == 1:
-    print("INFO: Using compass: Enabled. Heading will be aligned to north.")
+    print("INFO: Using compass: Enabled. Heading will be aligned to north.", flush=True)
 else:
-    print("INFO: Using compass: Disabled")
+    print("INFO: Using compass: Disabled", flush=True)
 
 if scale_calib_enable == True:
-    print("\nINFO: SCALE CALIBRATION PROCESS. DO NOT RUN DURING FLIGHT.\nINFO: TYPE IN NEW SCALE IN FLOATING POINT FORMAT\n")
+    print("\nINFO: SCALE CALIBRATION PROCESS. DO NOT RUN DURING FLIGHT.\nINFO: TYPE IN NEW SCALE IN FLOATING POINT FORMAT\n", flush=True)
 else:
     if scale_factor == 1.0:
-        print("INFO: Using default scale factor", scale_factor)
+        print("INFO: Using default scale factor", scale_factor, flush=True)
     else:
-        print("INFO: Using scale factor", scale_factor)
+        print("INFO: Using scale factor", scale_factor, flush=True)
 
 if not camera_orientation:
     camera_orientation = camera_orientation_default
-    print("INFO: Using default camera orientation", camera_orientation)
+    print("INFO: Using default camera orientation", camera_orientation, flush=True)
 else:
-    print("INFO: Using camera orientation", camera_orientation)
+    print("INFO: Using camera orientation", camera_orientation, flush=True)
 
 # Transformation to convert different camera orientations to NED convention. Replace camera_orientation_default for your configuration.
 #   0: Forward, USB port to the right
@@ -188,16 +189,16 @@ else:
     H_T265body_aeroBody = np.linalg.inv(H_aeroRef_T265Ref)
 
 if auto_set_ekf_home_enable == False:
-    print("INFO: Automatically set EKF home: DISABLED")
+    print("INFO: Automatically set EKF home: DISABLED", flush=True)
 else:
-    print("INFO: Automatically set EKF home: Enabled")
+    print("INFO: Automatically set EKF home: Enabled", flush=True)
 
 if not debug_enable:
     debug_enable = 0
 else:
     debug_enable = 1
     np.set_printoptions(precision=4, suppress=True) # Format output on terminal
-    print("INFO: Debug messages enabled.")
+    print("INFO: Debug messages enabled.", flush=True)
 
 #######################################
 # Functions
@@ -229,7 +230,7 @@ def send_confidence_level_dummy_message():
     global is_vehicle_connected, data, current_confidence
     if is_vehicle_connected == True and data is not None:
         # Show confidence level on terminal
-        print("INFO: Tracking confidence: ", pose_data_confidence_level[data.tracker_confidence])
+        print("INFO: Tracking confidence: ", pose_data_confidence_level[data.tracker_confidence], flush=True)
 
         # Send MAVLink message to show confidence level numerically
         msg = vehicle.message_factory.vision_position_delta_encode(
@@ -337,7 +338,7 @@ def statustext_callback(self, attr_name, value):
     # These are the status texts that indicates EKF is ready to receive home position
     if is_vehicle_connected == True and value.text == "GPS Glitch" or value.text == "GPS Glitch cleared" or value.text == "EKF2 IMU0 ext nav yaw alignment complete":
         time.sleep(0.1)
-        print("INFO: Set EKF home with default GPS location")
+        print("INFO: Set EKF home with default GPS location", flush=True)
         set_default_global_origin()
         set_default_home_position()
 
@@ -346,10 +347,10 @@ def att_msg_callback(self, attr_name, value):
     global heading_north_yaw
     if heading_north_yaw is None:
         heading_north_yaw = value.yaw
-        print("INFO: Received first ATTITUDE message with heading yaw", heading_north_yaw * 180 / m.pi, "degrees")
+        print("INFO: Received first ATTITUDE message with heading yaw", heading_north_yaw * 180 / m.pi, "degrees", flush=True)
     else:
         heading_north_yaw = value.yaw
-        print("INFO: Received ATTITUDE message with heading yaw", heading_north_yaw * 180 / m.pi, "degrees")
+        print("INFO: Received ATTITUDE message with heading yaw", heading_north_yaw * 180 / m.pi, "degrees", flush=True)
 
 def vehicle_connect():
     global vehicle, is_vehicle_connected
@@ -357,7 +358,7 @@ def vehicle_connect():
     try:
         vehicle = connect(connection_string, wait_ready = True, baud = connection_baudrate, source_system = 1)
     except:
-        print('Connection error! Retrying...')
+        print('Connection error! Retrying...', flush=True)
         sleep(1)
 
     if vehicle == None:
@@ -390,7 +391,7 @@ def scale_update():
     global scale_factor
     while True:
         scale_factor = float(input("INFO: Type in new scale as float number\n"))
-        print("INFO: New scale is ", scale_factor)
+        print("INFO: New scale is ", scale_factor, flush=True)
 
 def send_image(frame, mqtt_client, topic):
     try:
@@ -403,7 +404,7 @@ def send_image(frame, mqtt_client, topic):
         content = base64.b64encode(bytes)
         mqtt_client.publish(topic, content)
     except Exception as err:
-        print("Error sending image: " + str(err))
+        print("Error sending image: " + str(err), flush=True)
 
 #######################################
 # MQTT Setup
@@ -411,48 +412,48 @@ def send_image(frame, mqtt_client, topic):
 
 # The callback for when the client receives a CONNACK response from the server.
 def on_connect(client, userdata, flags, rc):
-    print("INFO: Connected to MQTT server with result code "+str(rc))
+    print("INFO: Connected to MQTT server with result code "+str(rc), flush=True)
     client.publish("presence", "drone")
     client.subscribe("command")
 
 # The callback for when a PUBLISH message is received from the server.
 def on_message(client, userdata, msg):
-    print("INFO: message received, topic: " + msg.topic + ", payload: " + msg.payload.decode())
+    print("INFO: message received, topic: " + msg.topic + ", payload: " + msg.payload.decode(), flush=True)
     if msg.topic == "command":
         cmd = msg.payload.decode("utf-8")
-        print("INFO: command received: " + cmd)
+        print("INFO: command received: " + cmd, flush=True)
         handle_cmd(cmd)
 
 def handle_cmd(cmd):
     try:
         if cmd == "arm":
-            print("INFO: arming...")
+            print("INFO: arming...", flush=True)
             arm()
         elif cmd == "disarm":
-            print("INFO: disarming...")
+            print("INFO: disarming...", flush=True)
             disarm()
         elif cmd == "takeoff":
-            print("INFO: takeoff!")
+            print("INFO: takeoff!", flush=True)
             takeoff()
         elif cmd == "land":
-            print("INFO: Land!")
+            print("INFO: Land!", flush=True)
             land()
         elif cmd == "stabilize":
-            print("INFO: Mode Stabilize")
+            print("INFO: Mode Stabilize", flush=True)
             stabilize()
         elif cmd == "loiter":
-            print("INFO: Mode Loiter")
+            print("INFO: Mode Loiter", flush=True)
             loiter()
         elif cmd == "altHold":
-            print("INFO: Mode Altitude Hold!")
+            print("INFO: Mode Altitude Hold!", flush=True)
             altHold()
         elif cmd == "mission_start":
-            print("INFO: mission_start!")
+            print("INFO: mission_start!", flush=True)
             mission_start()
         else:
-            print("INFO: received unrecognized command: " + cmd)
+            print("INFO: received unrecognized command: " + cmd, flush=True)
     except Exeption as err:
-        print("Error: " + err)
+        print("Error: " + err, flush=True)
 
 client = mqtt.Client()
 client.on_connect = on_connect
@@ -463,14 +464,14 @@ client.on_message = on_message
 #######################################
 
 
-print("INFO: Connecting to Realsense camera.")
+print("INFO: Connecting to Realsense camera.", flush=True)
 realsense_connect()
-print("INFO: Realsense connected.")
+print("INFO: Realsense connected.", flush=True)
 
-print("INFO: Connecting to vehicle.")
+print("INFO: Connecting to vehicle.", flush=True)
 while (not vehicle_connect()):
     pass
-print("INFO: Vehicle connected.")
+print("INFO: Vehicle connected.", flush=True)
 
 # Listen to the mavlink messages that will be used as trigger to set EKF home automatically
 if auto_set_ekf_home_enable == True:
@@ -503,11 +504,11 @@ if compass_enabled == 1:
     # Wait a short while for yaw to be correctly initiated
     time.sleep(1)
 
-print("INFO: Connecting to MQTT server.")
-client.connect("192.168.43.192", 1883, 10)
+print("INFO: Connecting to MQTT server.", flush=True)
+client.connect("192.168.0.119", 1883, 10)
 client.loop_start()
 
-print("INFO: Sending VISION_POSITION_ESTIMATE messages to FCU.")
+print("INFO: Sending VISION_POSITION_ESTIMATE messages to FCU.", flush=True)
 
 counter = 0
 try:
@@ -515,8 +516,8 @@ try:
         # Monitor last_heartbeat to reconnect in case of lost connection
         if vehicle.last_heartbeat > connection_timeout_sec_default:
             is_vehicle_connected = False
-            print("WARNING: CONNECTION LOST. Last hearbeat was %f sec ago."% vehicle.last_heartbeat)
-            print("WARNING: Attempting to reconnect ...")
+            print("WARNING: CONNECTION LOST. Last hearbeat was %f sec ago."% vehicle.last_heartbeat, flush=True)
+            print("WARNING: Attempting to reconnect ...", flush=True)
             vehicle_connect()
             continue
 
@@ -525,7 +526,7 @@ try:
 
         counter = counter + 1
         if counter % 10 == 0:
-            print("counter: " + str(counter))
+            print("counter: " + str(counter), flush=True)
             # fetch imagees
             f1 = frames.get_fisheye_frame(1)
             f2 = frames.get_fisheye_frame(2)
@@ -568,21 +569,21 @@ try:
             # Show debug messages here
             if debug_enable == 1:
                 os.system('clear') # This helps in displaying the messages to be more readable
-                print("DEBUG: Raw RPY[deg]: {}".format( np.array( tf.euler_from_matrix( H_T265Ref_T265body, 'sxyz')) * 180 / m.pi))
-                print("DEBUG: NED RPY[deg]: {}".format( np.array( tf.euler_from_matrix( H_aeroRef_aeroBody, 'sxyz')) * 180 / m.pi))
-                print("DEBUG: Raw pos xyz : {}".format( np.array( [data.translation.x, data.translation.y, data.translation.z])))
-                print("DEBUG: NED pos xyz : {}".format( np.array( tf.translation_from_matrix( H_aeroRef_aeroBody))))
+                print("DEBUG: Raw RPY[deg]: {}".format( np.array( tf.euler_from_matrix( H_T265Ref_T265body, 'sxyz')) * 180 / m.pi), flush=True)
+                print("DEBUG: NED RPY[deg]: {}".format( np.array( tf.euler_from_matrix( H_aeroRef_aeroBody, 'sxyz')) * 180 / m.pi), flush=True)
+                print("DEBUG: Raw pos xyz : {}".format( np.array( [data.translation.x, data.translation.y, data.translation.z])), flush=True)
+                print("DEBUG: NED pos xyz : {}".format( np.array( tf.translation_from_matrix( H_aeroRef_aeroBody))), flush=True)
 
 
 except KeyboardInterrupt:
-    print("INFO: KeyboardInterrupt has been caught. Cleaning up...")
+    print("INFO: KeyboardInterrupt has been caught. Cleaning up...", flush=True)
 
 except Exception as err:
-    print("Error: " + str(err))
+    print("Error: " + str(err), flush=True)
 
 finally:
     pipe.stop()
     vehicle.close()
     client.loop_stop(force=True)
-    print("INFO: Realsense pipeline and vehicle object closed.")
+    print("INFO: Realsense pipeline and vehicle object closed.", flush=True)
     sys.exit(1)
