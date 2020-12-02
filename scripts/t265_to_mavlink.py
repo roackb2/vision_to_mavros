@@ -1,3 +1,6 @@
+
+
+
 #!/usr/bin/env python3
 
 #####################################################
@@ -407,26 +410,18 @@ def send_image(frame, mqtt_client, topic):
 #######################################
 
 # The callback for when the client receives a CONNACK response from the server.
-def on_direct_connect(client, userdata, flags, rc):
-    print("INFO: Connected to Direct MQTT server with result code "+str(rc))
+def on_connect(client, userdata, flags, rc):
+    print("INFO: Connected to MQTT server with result code "+str(rc))
     client.publish("presence", "drone")
     client.subscribe("command")
 
 # The callback for when a PUBLISH message is received from the server.
-def on_direct_message(client, userdata, msg):
-    print("INFO: message received from direct, topic: " + msg.topic + ", payload: " + msg.payload.decode())
+def on_message(client, userdata, msg):
+    print("INFO: message received, topic: " + msg.topic + ", payload: " + msg.payload.decode())
     if msg.topic == "command":
         cmd = msg.payload.decode("utf-8")
         print("INFO: command received: " + cmd)
         handle_cmd(cmd)
-
-# The callback for when the client receives a CONNACK response from the server.
-def on_connect(client, userdata, flags, rc):
-    print("INFO: Connected to MQTT server with result code "+str(rc))
-
-# The callback for when a PUBLISH message is received from the server.
-def on_message(client, userdata, msg):
-    print("INFO: message received, topic: " + msg.topic + ", payload: " + msg.payload.decode())
 
 def handle_cmd(cmd):
     try:
@@ -462,10 +457,6 @@ def handle_cmd(cmd):
 client = mqtt.Client()
 client.on_connect = on_connect
 client.on_message = on_message
-
-direct_client = mqtt.Client()
-direct_client.on_connect = on_direct_connect
-direct_client.on_message = on_direct_message
 
 #######################################
 # Main code starts here
@@ -513,15 +504,8 @@ if compass_enabled == 1:
     time.sleep(1)
 
 print("INFO: Connecting to MQTT server.")
-client.connect("192.168.0.197", 1883, 10)
-# client.connect("10.3.141.1", 1883, 10)
-# client.connect("10.0.0.10", 1883, 10)
+client.connect("192.168.43.192", 1883, 10)
 client.loop_start()
-
-print("INFO: Connecting to MQTT server wit direct IP.")
-# direct_client.connect("10.3.141.233", 1883, 10)
-direct_client.connect("192.168.0.197", 1883, 10)
-direct_client.loop_start()
 
 print("INFO: Sending VISION_POSITION_ESTIMATE messages to FCU.")
 
