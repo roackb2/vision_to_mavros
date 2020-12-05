@@ -2,6 +2,7 @@
 
 
 
+
 #!/usr/bin/env python3
 
 #####################################################
@@ -506,15 +507,23 @@ client.on_message = on_message
 # Main code starts here
 #######################################
 
+print("INFO: Connecting to MQTT server.", flush=True)
+client.connect("192.168.0.119", 1883, 10)
+# client.connect("192.168.2.64", 1883, 10)
+client.loop_start()
+client.publish("status", "drone online")
 
 print("INFO: Connecting to Realsense camera.", flush=True)
+client.publish("status", "connecting to realsense")
 realsense_connect()
 print("INFO: Realsense connected.", flush=True)
 
+client.publish("status", "connecting to vehicle")
 print("INFO: Connecting to vehicle.", flush=True)
 while (not vehicle_connect()):
     pass
 print("INFO: Vehicle connected.", flush=True)
+client.publish("status", "vehicle connected")
 
 # Listen to the mavlink messages that will be used as trigger to set EKF home automatically
 if auto_set_ekf_home_enable == True:
@@ -547,11 +556,6 @@ if compass_enabled == 1:
     # Wait a short while for yaw to be correctly initiated
     time.sleep(1)
 
-print("INFO: Connecting to MQTT server.", flush=True)
-client.connect("192.168.0.119", 1883, 10)
-# client.connect("192.168.2.64", 1883, 10)
-client.loop_start()
-
 print("INFO: Sending VISION_POSITION_ESTIMATE messages to FCU.", flush=True)
 
 counter = 0
@@ -562,6 +566,7 @@ try:
             is_vehicle_connected = False
             print("WARNING: CONNECTION LOST. Last hearbeat was %f sec ago."% vehicle.last_heartbeat, flush=True)
             print("WARNING: Attempting to reconnect ...", flush=True)
+            client.publish("status", "reconnecting vehicle")
             vehicle_connect()
             continue
 
@@ -571,6 +576,7 @@ try:
         counter = counter + 1
         if counter % 10 == 0:
             print("counter: " + str(counter), flush=True)
+            client.publish("status", "counter: " + str(counter))
             # fetch imagees
             f1 = frames.get_fisheye_frame(1)
             f2 = frames.get_fisheye_frame(2)
