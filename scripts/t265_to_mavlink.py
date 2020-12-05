@@ -452,8 +452,11 @@ def on_message(client, userdata, msg):
 def handle_cmd(cmd):
     try:
         if cmd == "arm":
-            print("INFO: arming...", flush=True)
-            arm()
+            if is_flying():
+                print("INFO: Vehicle is flying, don't arm again!")
+            else:
+                print("INFO: arming...", flush=True)
+                arm()
         elif cmd == "disarm":
             print("INFO: disarming...", flush=True)
             disarm()
