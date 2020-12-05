@@ -38,9 +38,19 @@ import paho.mqtt.client as mqtt
 from time import sleep
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from dronekit import connect, VehicleMode
+from dronekit import connect, VehicleMode, Vehicle
 from pymavlink import mavutil
 from PIL import Image
+
+MAV_STATE_UNINIT        = 0
+MAV_STATE_BOOT          = 1
+MAV_STATE_CALIBRATING   = 2
+MAV_STATE_STANDBY       = 3
+MAV_STATE_ACTIVE        = 4
+MAV_STATE_CRITICAL      = 5
+MAV_STATE_EMERGENCY     = 6
+MAV_STATE_HILSIM        = 7
+MAV_STATE_POWEROFF      = 8
 
 #######################################
 # Parameters
@@ -72,6 +82,7 @@ home_lon = 0        # Somewhere in Africa
 home_alt = 0
 
 vehicle = None
+_isflying = False
 is_vehicle_connected = False
 pipe = None
 
@@ -297,6 +308,19 @@ def set_default_home_position():
         vehicle.send_mavlink(msg)
         vehicle.flush()
 
+
+def is_flying():
+    global _isflying
+    if((vehicle._vehicle_type != mavutil.mavlink.MAV_TYPE_QUADROTOR) and
+        (vehicle._vehicle_type != mavutil.mavlink.MAV_TYPE_FIXED_WING)):
+        return None
+
+    isFlying = ((vehicle._system_status == MAV_STATE_ACTIVE) or
+        ((_isflying == True) and (vehicle._system_status == MAV_STATE_CRITICAL or vehicle._system_status == MAV_STATE_EMERGENCY)))
+
+    _isflying = isFlying
+    return _isflying
+
 def arm():
     vehicle.armed   = True
 
@@ -422,6 +446,7 @@ def on_message(client, userdata, msg):
     if msg.topic == "command":
         cmd = msg.payload.decode("utf-8")
         print("INFO: command received: " + cmd, flush=True)
+        print("is flying: " + str(is_flying()))
         handle_cmd(cmd)
 
 def handle_cmd(cmd):
@@ -433,23 +458,38 @@ def handle_cmd(cmd):
             print("INFO: disarming...", flush=True)
             disarm()
         elif cmd == "takeoff":
-            print("INFO: takeoff!", flush=True)
-            takeoff()
+            if is_flying():
+                print("INFO: Vehicle is flying, don't takeof again!")
+            else:
+                print("INFO: takeoff!", flush=True)
+                takeoff()
         elif cmd == "land":
             print("INFO: Land!", flush=True)
             land()
         elif cmd == "stabilize":
-            print("INFO: Mode Stabilize", flush=True)
-            stabilize()
+            if is_flying():
+                print("INFO: Vehicle is flying, won't change mode to stabilize")
+            else:
+                print("INFO: Mode Stabilize", flush=True)
+                stabilize()
         elif cmd == "loiter":
-            print("INFO: Mode Loiter", flush=True)
-            loiter()
+            if is_flying():
+                print("INFO: Vehicle is flying, won't change mode to loiter")
+            else:
+                print("INFO: Mode Loiter", flush=True)
+                loiter()
         elif cmd == "altHold":
-            print("INFO: Mode Altitude Hold!", flush=True)
-            altHold()
+            if is_flying():
+                print("INFO: Vehicle is flying, won't change mode to altitude hold")
+            else:
+                print("INFO: Mode Altitude Hold!", flush=True)
+                altHold()
         elif cmd == "mission_start":
-            print("INFO: mission_start!", flush=True)
-            mission_start()
+            if is_flying():
+                print("INFO: Vehicle is flying, won't start mission")
+            else:
+                print("INFO: mission_start!", flush=True)
+                mission_start()
         else:
             print("INFO: received unrecognized command: " + cmd, flush=True)
     except Exeption as err:
@@ -506,6 +546,7 @@ if compass_enabled == 1:
 
 print("INFO: Connecting to MQTT server.", flush=True)
 client.connect("192.168.0.119", 1883, 10)
+# client.connect("192.168.2.64", 1883, 10)
 client.loop_start()
 
 print("INFO: Sending VISION_POSITION_ESTIMATE messages to FCU.", flush=True)
