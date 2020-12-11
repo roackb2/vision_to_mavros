@@ -508,7 +508,7 @@ client.on_message = on_message
 #######################################
 
 print("INFO: Connecting to MQTT server.", flush=True)
-client.connect("192.168.0.119", 1883, 10)
+client.connect_async("192.168.2.64", 1883, 10)
 # client.connect("192.168.2.64", 1883, 10)
 client.loop_start()
 client.publish("status", "drone online")
